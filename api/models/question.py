@@ -21,5 +21,5 @@ class Answer(object):
         conn = open_connection()
         cur = conn.cursor()
         cur.execute("INSERT INTO answers "
-                    "(answer_body, date_answered) VALUES ('{}', '{}')".format(self.answer_body, time))
+                    "(answer_body, answered_at) VALUES ('{}', '{}')".format(self.answer_body, time))
         close_connection(conn)

@@ -29,6 +29,7 @@ QUERY_SET = [
     answer_body VARCHAR NOT NULL,
     user_id INT REFERENCES users(user_id),
     question_id INT REFERENCES questions(question_id),
+    question_owner VARCHAR,
     answered_by VARCHAR,
     answered_at TIMESTAMP
     )

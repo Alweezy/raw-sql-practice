@@ -136,6 +136,99 @@ def manipulate_questions(user_id, question_id):
         return make_response(jsonify(response)), 200
 
 
+@api.route("questions/<question_id>/answers", methods=["GET", "POST"])
+@requires_authentication
+def answers(user_id, question_id):
+    """Post, retrieve a question's answers using the question id
+    """
+    conn = open_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM questions WHERE question_id='{}'".format(question_id))
+    question = cur.fetchall()
+
+    if not question:
+        response = {
+            "message": "Question with that id does not exist"
+        }
+
+        return make_response(jsonify(response)), 404
+    if request.method == "POST":
+        answer_body = request.get_json('answer_body')['answer_body']
+        if not answer_body or answer_body == " ":
+            response = {
+                "message": "Answer cannot be blank"
+            }
+
+            return make_response(jsonify(response)), 400
+
+        cur.execute("SELECT answer_body FROM questions INNER JOIN answers ON "
+                    "answers.question_id = questions.question_id WHERE"
+                    "(answers.answer_body = '{}' AND answers.user_id = '{}' AND answers.question_id = '{}')"
+                    .format(answer_body, user_id, question_id))
+
+        answer_exists = cur.fetchall()
+
+        if answer_exists:
+            response = {
+                "message": "You have already given that answer"
+            }
+
+            return make_response(jsonify(response)), 409
+
+        time = datetime.utcnow()
+        Answer(answer_body, time)
+        cur.execute("SELECT MAX(answer_id) from answers")
+        answer = cur.fetchone()
+
+        cur.execute("UPDATE answers SET user_id='{}' where answer_id='{}'".format(user_id, answer[0]))
+
+        cur.execute("SELECT username FROM users WHERE user_id='{}'".format(user_id))
+        user = cur.fetchone()
+
+        cur.execute("UPDATE answers SET answered_by='{}' WHERE answer_id='{}'".format(user[0], answer[0]))
+        conn.commit()
+
+        cur.execute("UPDATE answers SET question_id = {} where answer_id ='{}'"
+                    .format(question_id, answer[0]))
+        conn.commit()
+
+        cur.execute("SELECT questions.user_id FROM questions INNER JOIN answers"
+                    " ON answers.question_id=questions.question_id WHERE questions.question_id='{}'".format(question_id))
+
+        question_owner = cur.fetchone()
+        cur.execute("UPDATE answers SET question_owner='{}' WHERE  answer_id='{}'".format(question_owner[0], answer[0]))
+        conn.commit()
+
+        cur.execute("SELECT * FROM answers WHERE answer_body='{}' AND user_id='{}'".format(answer_body, user_id))
+        answer_data = cur.fetchone()
+
+        cur.execute("UPDATE questions SET answers = array_append(answers, '{}') WHERE question_id='{}'".
+                    format(answer_data[1], question_id))
+        conn.commit()
+
+        cur.execute("UPDATE  users SET answers = array_append(answers, '{}')".format(answer_data[1]))
+        cur.close()
+
+        response = {
+            "answer_id": answer_data[0],
+            "answer": answer_data[1],
+            "question_id": answer_data[2],
+            "user_id": answer_data[3],
+            "answered_by": answer_data[4],
+            "question_owner": answer_data[5],
+            "answered_at": answer_data[6]
+        }
+
+        return make_response(jsonify(response)), 201
+    else:
+        response = {
+            "message": "Method currently after development"
+        }
+
+        return make_response(jsonify(response)), 200
+
+
+
 
 
 
